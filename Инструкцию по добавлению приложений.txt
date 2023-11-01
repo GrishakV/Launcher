@@ -1,0 +1,71 @@
+Инструкция по добавлению своего приложения в лаунчер
+
+!!!ВАЖНО
+!!!Приложение должно быть реализованно как QWidget
+
+1. Добавить файлы источников(.h и .cpp) своего приложения в проект AppLoaderplugin
+
+2. В файле interfaces.h создать собственный класс интерфейса, в котором объявить функцию создания виджета. 
+Пример:
+class ExampleInterface
+{
+public:
+    virtual ~ExampleInterface() {}
+    virtual QObject *getExampleWidget() = 0;
+};
+
+#define ExampleInterface_iid "com.example.ExampleInterface/1.0"
+Q_DECLARE_INTERFACE(ExampleInterface, ExampleInterface_iid)
+
+3. В классе AppLoaderPlugin необходимо выполнить несколько действий:
+а) Подключить заголовочный файл добавляемого виджета к проекту(#include "examplewidget.h)
+б) Добавить наследование от созданного в пункте 2 интерфейса(public ExampleInterface)
+в) В макрос Q_INTERFACES добавить созданный в пункте 2 интерфейс.
+г) В apploaderplugin.h и apploaderplugin.cpp реализовать функцию создания виджета
+Пример:
+
+.h
+public:
+    QObject *getExampleWidget() override;
+
+.cpp
+QObject *AppLoaderPlugin::getExampleWidget()
+{
+    ExampleWidget *exampleWidget = new ExampleWidget;
+    return qobject_cast<QObject*>(exampleWidget);
+}
+
+4. Добавить в меню приложения пункт с создаваемым плагином. 
+Для этого нужно добавить в таблицу БД admMenus запись, содержащую информацию о добавляемом приложении.
+Также необходимо добавить одну или несколько записей в таблицу admMenuRoles, чтобы указать,
+пользователям с какими ролями будет доступно ваше приложение.
+
+5. В файле mainprojectwindow.h необходимо добавить функцию, которая будет вызывать ваше приложение внутри основного окна
+
+private:
+    void exampleWindow();
+
+6. В фунции dynamicActions() необходимо добавить условие, при котором будет вызываться ваше приложение:
+
+    else if (appName == "Example")		(Вместо "Example" нужно указать имя элемента меню, указанное в 4 пункте в столбце menu_title)   
+    {
+        exampleWindow();
+    }
+
+7. Реализовать функцию exampleWindow()
+
+    QPluginLoader loader;
+    loader.setFileName("plugins/AppLoaderPlugin");
+    ExampleInterface *exampleInterface = qobject_cast<ExampleInterface *>(loader.instance());
+    if (exampleInterface)
+    {
+        QObject *exampleObject = exampleInterface->getExampleWidget();
+        QWidget *exampleWidget = qobject_cast<QWidget*>(exampleObject);
+
+        tabWidget->addTab(exampleWidget, "Example");
+    } else
+    {
+        qDebug() << loader.errorString();
+    }
+  
+8. Пересобрать проект.
